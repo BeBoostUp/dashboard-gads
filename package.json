@@ -1,0 +1,12 @@
+{
+  "name": "google-ads-command-center",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server.mjs",
+    "start": "node server.mjs",
+    "oauth": "node oauth-helper.mjs",
+    "check": "node --check app.js && node --check server.mjs && node --check oauth-helper.mjs"
+  }
+}

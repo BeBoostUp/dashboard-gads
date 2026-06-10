@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Google Ads Command Center</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegacion principal">
+        <div class="brand">
+          <span class="brand-mark">GA</span>
+          <div>
+            <strong>Ads Center</strong>
+            <span>Decision diaria</span>
+          </div>
+        </div>
+
+        <nav class="nav-list">
+          <a href="#overview" class="is-active">Panel</a>
+          <a href="#decisions">Campanas</a>
+          <a href="#assets">Assets</a>
+          <a href="#keywords">Keywords</a>
+          <a href="#search-terms">Terminos</a>
+          <a href="#automation">Automatizacion</a>
+        </nav>
+
+        <div class="api-state" id="apiState">
+          <span class="state-dot" id="apiStateDot"></span>
+          <div>
+            <strong id="apiStateTitle">API no conectada</strong>
+            <span id="apiStateDetail">Modo local con datos demo/CSV</span>
+          </div>
+        </div>
+      </aside>
+
+      <main>
+        <header class="topbar" id="overview">
+          <div>
+            <p class="eyebrow">Dashboard Google Ads</p>
+            <h1>Control de optimizacion por cliente</h1>
+          </div>
+
+          <div class="toolbar" aria-label="Filtros">
+            <label>
+              Cliente
+              <select id="clientFilter"></select>
+            </label>
+            <label>
+              Vista
+              <select id="windowFilter">
+                <option value="7">Ultimos 7 dias</option>
+                <option value="14">Ultimos 14 dias</option>
+                <option value="30" selected>Ultimos 30 dias</option>
+                <option value="90">Ultimos 90 dias</option>
+              </select>
+            </label>
+            <button class="secondary-button" id="resetDemo">Restaurar demo</button>
+          </div>
+        </header>
+
+        <section class="mode-band" aria-label="Tipo de dashboard">
+          <div>
+            <strong>Tipo de dashboard</strong>
+            <span id="modeDescription">KPIs orientados a captacion de leads.</span>
+          </div>
+          <div class="mode-switch" role="group" aria-label="Elegir tipo de negocio">
+            <button class="mode-button is-active" id="leadGenMode" type="button" data-mode="leadgen">Lead Gen</button>
+            <button class="mode-button" id="ecommerceMode" type="button" data-mode="ecommerce">Ecommerce</button>
+          </div>
+          <input id="csvInput" type="file" accept=".csv,text/csv" hidden />
+        </section>
+
+        <section class="connection-band" aria-label="Conexion Google Ads">
+          <div>
+            <strong>Conexion Google Ads API</strong>
+            <span id="connectionStatus">Pendiente de configurar credenciales locales.</span>
+          </div>
+          <div class="import-actions">
+            <button class="secondary-button" id="checkApi">Comprobar API</button>
+            <button class="primary-button" id="loadApiData">Cargar datos reales</button>
+          </div>
+        </section>
+
+        <section class="kpi-grid" aria-label="Resumen de rendimiento">
+          <article class="kpi-tile">
+            <span id="kpiSpendLabel">Inversion</span>
+            <strong id="kpiSpend">-</strong>
+            <small id="kpiSpendHint">-</small>
+          </article>
+          <article class="kpi-tile">
+            <span id="kpiConversionsLabel">Conversiones</span>
+            <strong id="kpiConversions">-</strong>
+            <small id="kpiCvrHint">-</small>
+          </article>
+          <article class="kpi-tile">
+            <span id="kpiCpaLabel">CPA medio</span>
+            <strong id="kpiCpa">-</strong>
+            <small id="kpiCpaHint">-</small>
+          </article>
+          <article class="kpi-tile">
+            <span id="kpiRoasLabel">ROAS</span>
+            <strong id="kpiRoas">-</strong>
+            <small id="kpiRoasHint">-</small>
+          </article>
+          <article class="kpi-tile">
+            <span id="kpiCtrLabel">CTR</span>
+            <strong id="kpiCtr">-</strong>
+            <small id="kpiCtrHint">-</small>
+          </article>
+        </section>
+
+        <section class="workspace-grid">
+          <div class="primary-column">
+            <section class="panel" id="decisions">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Decision de inversion</p>
+                  <h2>Escalar, mantener o quitar</h2>
+                </div>
+                <button class="secondary-button" id="exportPlan">Exportar plan</button>
+              </div>
+
+              <div class="decision-grid">
+                <div class="decision-column scale">
+                  <header>
+                    <strong>Escalar</strong>
+                    <span id="scaleCount">0</span>
+                  </header>
+                  <div id="scaleList" class="decision-list"></div>
+                </div>
+                <div class="decision-column hold">
+                  <header>
+                    <strong>Mantener</strong>
+                    <span id="holdCount">0</span>
+                  </header>
+                  <div id="holdList" class="decision-list"></div>
+                </div>
+                <div class="decision-column cut">
+                  <header>
+                    <strong>Quitar</strong>
+                    <span id="cutCount">0</span>
+                  </header>
+                  <div id="cutList" class="decision-list"></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel" id="assets">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Auditoria profunda</p>
+                  <h2>Titulos, descripciones, imagenes y extensiones</h2>
+                </div>
+                <select id="assetActionFilter" aria-label="Filtrar assets">
+                  <option value="all">Todas las acciones</option>
+                  <option value="replace">Cambiar</option>
+                  <option value="test">Test A/B</option>
+                  <option value="keep">Mantener</option>
+                </select>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Asset</th>
+                      <th>Campana</th>
+                      <th>Tipo</th>
+                      <th>Rendimiento</th>
+                      <th>Accion</th>
+                      <th>Motivo</th>
+                    </tr>
+                  </thead>
+                  <tbody id="assetTable"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="panel" id="keywords">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Keywords</p>
+                  <h2>Ganadoras, caras y candidatas</h2>
+                </div>
+                <button class="secondary-button" id="exportKeywords">Exportar keywords</button>
+              </div>
+              <div class="keyword-columns">
+                <div>
+                  <h3>Mejor funcionan</h3>
+                  <div id="topKeywords" class="rank-list"></div>
+                </div>
+                <div>
+                  <h3>Revisar puja o concordancia</h3>
+                  <div id="watchKeywords" class="rank-list"></div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <aside class="side-column">
+            <section class="panel compact-panel">
+              <div class="section-heading tight">
+                <div>
+                  <p class="eyebrow">Salud de cuenta</p>
+                  <h2>Prioridades</h2>
+                </div>
+              </div>
+              <div id="priorityList" class="priority-list"></div>
+            </section>
+
+            <section class="panel compact-panel">
+              <div class="section-heading tight">
+                <div>
+                  <p class="eyebrow">Conversiones</p>
+                  <h2>Objetivos que llegan</h2>
+                </div>
+              </div>
+              <div id="conversionActionList" class="conversion-list"></div>
+            </section>
+
+            <section class="panel compact-panel">
+              <div class="section-heading tight">
+                <div>
+                  <p class="eyebrow">Negocio real</p>
+                  <h2>CAC y margen</h2>
+                </div>
+              </div>
+              <div class="unit-economics-box">
+                <label>
+                  Clientes cerrados
+                  <input id="closedCustomersInput" type="number" min="0" step="1" placeholder="0" />
+                </label>
+                <label>
+                  Beneficio por cliente
+                  <input id="profitPerCustomerInput" type="number" min="0" step="10" placeholder="0" />
+                </label>
+                <div id="unitEconomicsSummary" class="economics-summary"></div>
+              </div>
+            </section>
+
+            <section class="panel compact-panel" id="search-terms">
+              <div class="section-heading tight">
+                <div>
+                  <p class="eyebrow">Terminos</p>
+                  <h2>Negativas sugeridas</h2>
+                </div>
+                <button class="icon-button" id="exportNegatives" title="Exportar negativas" aria-label="Exportar negativas">CSV</button>
+              </div>
+              <div id="negativeTerms" class="term-list"></div>
+            </section>
+
+            <section class="panel compact-panel" id="automation">
+              <div class="section-heading tight">
+                <div>
+                  <p class="eyebrow">Automatizacion</p>
+                  <h2>Modo seguro</h2>
+                </div>
+              </div>
+              <div class="automation-box">
+                <label class="switch-line">
+                  <input id="autoNegativeToggle" type="checkbox" disabled />
+                  <span>Aplicar negativas por API</span>
+                </label>
+                <label class="switch-line">
+                  <input id="autoBudgetToggle" type="checkbox" disabled />
+                  <span>Ajustar presupuestos</span>
+                </label>
+                <p>Activable cuando conectemos OAuth, customer ID y permisos de escritura.</p>
+              </div>
+            </section>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>

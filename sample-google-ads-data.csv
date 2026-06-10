@@ -1,0 +1,26 @@
+entity,client,campaign,channel,status,spend,conversions,conversion_value,impressions,clicks,budget,target_cpa,target_roas,lost_budget,lost_rank,keyword,match_type,search_term,asset_type,asset,strength,policy
+campaign,TeknoDental,Implantes Madrid - Search,Search,enabled,4120,87,16840,112000,6840,180,58,3.1,28,12,,,,,,,
+campaign,TeknoDental,Ortodoncia Invisible - PMax,Performance Max,enabled,3650,42,7220,194000,5120,145,70,2.5,8,22,,,,,,,
+campaign,VidaFit,Nutricion Online - Search,Search,enabled,2240,96,11520,79000,4020,90,32,3.7,36,8,,,,,,,
+campaign,VidaFit,Recetas Gratis - Display,Display,enabled,980,4,260,312000,1880,55,35,2.2,2,5,,,,,,,
+campaign,CasaNorte,Reformas Integrales - Search,Search,enabled,5480,38,26200,88000,3390,240,155,4,18,18,,,,,,,
+campaign,CasaNorte,Decoracion Blog - Demand Gen,Demand Gen,enabled,1360,7,1190,225000,2890,70,120,2,4,11,,,,,,,
+keyword,TeknoDental,Implantes Madrid - Search,,enabled,940,28,5960,12100,980,,58,,,,implantes dentales madrid,phrase,,,,,
+keyword,TeknoDental,Implantes Madrid - Search,,enabled,720,17,3530,9400,760,,58,,,,precio implante dental,exact,,,,,
+keyword,TeknoDental,Ortodoncia Invisible - PMax,,enabled,610,2,180,18500,840,,70,,,,alineadores baratos,broad,,,,,
+keyword,VidaFit,Nutricion Online - Search,,enabled,610,36,4680,8900,640,,32,,,,nutricionista online,exact,,,,,
+keyword,VidaFit,Recetas Gratis - Display,,enabled,320,0,0,43100,610,,35,,,,recetas gratis pdf,broad,,,,,
+keyword,CasaNorte,Reformas Integrales - Search,,enabled,1430,16,12600,14900,710,,155,,,,empresa reformas integrales,phrase,,,,,
+keyword,CasaNorte,Decoracion Blog - Demand Gen,,enabled,480,1,90,64000,930,,120,,,,ideas decoracion salon,broad,,,,,
+search_term,TeknoDental,Implantes Madrid - Search,,enabled,220,9,1980,2100,140,,,,,,implantes dentales madrid,,clinica implantes dentales madrid,,,,
+search_term,TeknoDental,Ortodoncia Invisible - PMax,,enabled,165,0,0,7400,250,,,,,,alineadores baratos,,ortodoncia invisible gratis,,,,
+search_term,VidaFit,Nutricion Online - Search,,enabled,140,12,1560,1100,88,,,,,,nutricionista online,,nutricionista online para perder peso,,,,
+search_term,VidaFit,Recetas Gratis - Display,,enabled,112,0,0,15200,210,,,,,,recetas gratis pdf,,descargar recetas gratis pdf,,,,
+search_term,CasaNorte,Reformas Integrales - Search,,enabled,390,5,4600,2200,144,,,,,,empresa reformas integrales,,empresa reformas integrales madrid,,,,
+search_term,CasaNorte,Decoracion Blog - Demand Gen,,enabled,96,0,0,19800,180,,,,,,ideas decoracion salon,,trabajo decorador interiores,,,,
+asset,TeknoDental,Implantes Madrid - Search,,enabled,880,31,6240,19000,1460,,,,,,,,,Titulo,Implantes dentales desde 49 euros al mes,82,eligible
+asset,TeknoDental,Ortodoncia Invisible - PMax,,enabled,610,3,330,78000,940,,,,,,,,,Imagen,Sonrisa generica fondo blanco,31,eligible
+asset,VidaFit,Nutricion Online - Search,,enabled,520,34,4420,16500,1040,,,,,,,,,Descripcion,Planes personalizados con seguimiento semanal,89,eligible
+asset,VidaFit,Recetas Gratis - Display,,enabled,210,0,0,84000,380,,,,,,,,,Titulo,Recetas rapidas para todos,28,eligible
+asset,CasaNorte,Reformas Integrales - Search,,enabled,720,9,7600,10600,720,,,,,,,,,Extension,Presupuesto en 24 horas,76,eligible
+asset,CasaNorte,Decoracion Blog - Demand Gen,,enabled,310,1,90,96000,720,,,,,,,,,Imagen,Salon minimalista sin antes/despues,34,eligible

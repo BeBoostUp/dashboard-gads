@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: dahsboard-gads
+    runtime: node
+    plan: starter
+    buildCommand: ""
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: HOST
+        value: 0.0.0.0
+      - key: GOOGLE_ADS_API_VERSION
+        value: v22
+      - key: GOOGLE_ADS_PER_ACCOUNT_LIMIT
+        value: 50
+      - key: GOOGLE_ADS_REFRESH_INTERVAL_MINUTES
+        value: 360
+      - key: GOOGLE_ADS_AUTO_PRIME
+        value: true
+      - key: GOOGLE_ADS_DEVELOPER_TOKEN
+        sync: false
+      - key: GOOGLE_ADS_CLIENT_ID
+        sync: false
+      - key: GOOGLE_ADS_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_ADS_REFRESH_TOKEN
+        sync: false
+      - key: GOOGLE_ADS_LOGIN_CUSTOMER_ID
+        sync: false
+      - key: GOOGLE_ADS_TARGET_MCC_ID
+        sync: false
