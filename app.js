@@ -1001,7 +1001,7 @@ function updateSourceState(status) {
   const usingApi = dataSource === "api";
   if (status?.configured) {
     els.apiStateTitle.textContent = usingApi ? "API conectada" : "API lista";
-    els.apiStateDetail.textContent = `MCC ${status.targetMccId || "configurado"} · ${usingApi ? "datos reales" : "pendiente de cargar"}`;
+    els.apiStateDetail.textContent = `MCC ${status.targetMccId || "configurado"} · ${usingApi ? currentWindowLabel().toLowerCase() : "pendiente de cargar"}`;
     els.apiStateDot.style.background = "var(--green)";
     els.connectionStatus.textContent = usingApi
       ? "Datos reales cargados desde Google Ads API."
@@ -1012,7 +1012,7 @@ function updateSourceState(status) {
 
   const missing = status?.missing?.length ? status.missing.join(", ") : "";
   els.apiStateTitle.textContent = usingApi ? "Datos API guardados" : "API no conectada";
-  els.apiStateDetail.textContent = usingApi ? "Ultima lectura guardada en navegador" : "Modo local con datos demo/CSV";
+  els.apiStateDetail.textContent = usingApi ? `Ultima lectura: ${currentWindowLabel().toLowerCase()}` : "Modo local con datos demo/CSV";
   els.apiStateDot.style.background = usingApi ? "var(--green)" : "var(--amber)";
   els.connectionStatus.textContent = usingApi
     ? "Datos reales cargados desde Google Ads API."
@@ -1512,8 +1512,14 @@ async function loadApiData(options = {}) {
   const days = currentWindowDays();
   const label = options.auto ? "Actualizando..." : "Cargando...";
   setBusy(els.loadApiData, true, label);
+  els.connectionStatus.textContent = `Cargando datos reales de ${currentWindowLabel().toLowerCase()}...`;
   try {
-    const snapshot = await apiGet(`/api/google-ads/snapshot?days=${encodeURIComponent(days)}`);
+    const params = new URLSearchParams({
+      days,
+      t: String(Date.now())
+    });
+    if (options.force) params.set("force", "1");
+    const snapshot = await apiGet(`/api/google-ads/snapshot?${params.toString()}`);
     if (!snapshot.rows?.length) {
       showToast("La API respondio, pero no devolvio campanas");
       return;
@@ -1524,8 +1530,10 @@ async function loadApiData(options = {}) {
     saveMeta(snapshot);
     render();
     const errorText = snapshot.errors?.length ? ` · ${snapshot.errors.length} cuenta(s) con aviso` : "";
-    showToast(`${snapshot.rows.length} datos reales cargados${errorText}`);
+    els.connectionStatus.textContent = `Datos reales cargados: ${currentWindowLabel().toLowerCase()}.`;
+    showToast(`${snapshot.rows.length} datos reales cargados · ${currentWindowLabel()}${errorText}`);
   } catch (error) {
+    updateSourceState();
     showToast(error.message);
   } finally {
     setBusy(els.loadApiData, false, "Cargar datos reales");
@@ -1562,12 +1570,9 @@ function shouldAutoLoadApi(status) {
 async function handleWindowChange() {
   const custom = els.windowFilter.value === "custom";
   els.customWindowLabel.classList.toggle("is-hidden", !custom);
-  if (custom) {
-    els.customWindowInput.value = currentWindowDays();
-  }
 
   if (dataSource === "api") {
-    await loadApiData({ auto: true });
+    await loadApiData({ auto: true, force: true });
     return;
   }
 
@@ -1583,7 +1588,13 @@ async function initApi() {
 }
 
 async function apiGet(path) {
-  const response = await fetch(path, { headers: { Accept: "application/json" } });
+  const response = await fetch(path, {
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "Cache-Control": "no-cache"
+    }
+  });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data.message || data.error || "No se pudo conectar con el backend");
