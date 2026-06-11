@@ -488,8 +488,14 @@ function currentRows(entity) {
   const selectedClient = els.clientFilter.value;
   return rows.filter((row) => {
     const clientMatch = selectedClient === "all" || row.client === selectedClient;
-    return row.entity === entity && clientMatch;
+    return row.entity === entity && clientMatch && isActiveRow(row);
   });
+}
+
+function isActiveRow(row) {
+  if (!Object.prototype.hasOwnProperty.call(row, "status") || row.status === "") return true;
+  const status = normalizeText(row.status);
+  return ["enabled", "active", "serving", "eligible"].includes(status);
 }
 
 function currentWindowDays() {
@@ -541,11 +547,15 @@ function buildClientBenchmarks(campaigns) {
     const current = byClient.get(campaign.client) || {
       spend: 0,
       conversions: 0,
-      value: 0
+      value: 0,
+      impressions: 0,
+      clicks: 0
     };
     current.spend += safeNumber(campaign.spend);
     current.conversions += safeNumber(campaign.conversions);
     current.value += safeNumber(campaign.conversion_value);
+    current.impressions += safeNumber(campaign.impressions);
+    current.clicks += safeNumber(campaign.clicks);
     byClient.set(campaign.client, current);
   }
 
@@ -558,6 +568,8 @@ function buildClientBenchmarks(campaigns) {
         {
           cpa: ratio(summary.spend, summary.conversions) || globalCpa,
           roas: ratio(summary.value, summary.spend) || globalRoas,
+          cvr: ratio(summary.conversions, summary.clicks),
+          ctr: ratio(summary.clicks, summary.impressions),
           summary,
           economics: economicsFor(client)
         }
@@ -604,7 +616,7 @@ function verdictLabel(verdict) {
     MAINTAIN: "Mantener",
     OPTIMIZE: "Optimizar",
     REVIEW: "Revisar",
-    PAUSE: "Pausar",
+    PAUSE: "Parar",
     LEARNING: "Aprendizaje",
     INSUFFICIENT_DATA: "Pocos datos"
   };
@@ -630,18 +642,23 @@ function calculateMarketPressureIndex() {
   };
 }
 
-function calculateCampaignScore({ cpaAdjusted, targetCpa, conversions, lostBudget, lostRank, roas, hasRevenue }) {
-  const performanceRatio = targetCpa > 0 ? cpaAdjusted / targetCpa : 1;
-  const performanceScore = 100 / (1 + Math.exp(4 * (performanceRatio - 1)));
+function calculateCampaignScore({ cpaAdjusted, targetCpa, conversions, lostBudget, lostRank, roas, targetRoas, hasRevenue }) {
+  const leadPerformanceRatio = targetCpa > 0 && conversions > 0 ? cpaAdjusted / targetCpa : 2;
+  const roasPerformanceRatio = targetRoas > 0 && hasRevenue ? roas / targetRoas : 1;
+  const performanceScore =
+    dashboardMode === "ecommerce" && hasRevenue
+      ? clamp(roasPerformanceRatio * 75, 0, 100)
+      : clamp(100 - (leadPerformanceRatio - 0.75) * 80, 0, 100);
   const trendScore = 50;
-  const volumeScore = clamp((conversions / 30) * 100, 0, 100);
+  const volumeTarget = dashboardMode === "ecommerce" ? 8 : 20;
+  const volumeScore = clamp((conversions / volumeTarget) * 100, 0, 100);
   const headroomScore = clamp(Math.max(lostBudget, lostRank), 0, 100);
   const qualityScore = hasRevenue ? clamp(roas * 25, 0, 100) : 50;
   const weights = {
-    performance: 0.4,
-    trend: 0.2,
-    volume: 0.15,
-    headroom: 0.15,
+    performance: 0.55,
+    trend: 0.05,
+    volume: 0.25,
+    headroom: 0.05,
     quality: 0.1
   };
   const total =
@@ -662,28 +679,58 @@ function calculateCampaignScore({ cpaAdjusted, targetCpa, conversions, lostBudge
   };
 }
 
-function applyProtections(rawVerdict, context) {
+function decideCampaignByRules(context) {
   const overrides = [];
-  let finalVerdict = rawVerdict;
-  const minConversions = dashboardMode === "ecommerce" ? 3 : 5;
+  const minScaleConversions = dashboardMode === "ecommerce" ? 3 : 8;
+  const minJudgeConversions = dashboardMode === "ecommerce" ? 2 : 3;
+  const targetCpa = Math.max(context.targetCpa, 1);
+  const targetRoas = Math.max(context.targetRoas, 0.1);
+  const hasEnoughSpendToJudge = context.spend >= Math.max(targetCpa * 1.5, 100);
+  const hasHeadroom = Math.max(context.lostBudget, context.lostRank) >= 10;
+  const hasConversions = context.conversions > 0;
 
-  if (context.conversions < minConversions) {
+  if (!hasConversions && hasEnoughSpendToJudge) {
     return {
-      finalVerdict: "INSUFFICIENT_DATA",
-      overrides: ["insufficient_volume"]
+      finalVerdict: "PAUSE",
+      overrides: ["spend_without_conversions"]
     };
   }
 
-  if (context.ipm > 1.3 && ["PAUSE", "REVIEW", "OPTIMIZE"].includes(finalVerdict)) {
-    finalVerdict = {
-      PAUSE: "REVIEW",
-      REVIEW: "OPTIMIZE",
-      OPTIMIZE: "MAINTAIN"
-    }[finalVerdict];
-    overrides.push("market_severe_pressure");
+  if (!hasConversions || context.conversions < minJudgeConversions) {
+    return {
+      finalVerdict: "LEARNING",
+      overrides: ["low_volume"]
+    };
   }
 
-  return { finalVerdict, overrides };
+  if (dashboardMode === "ecommerce" && context.hasRevenue) {
+    const roasRatio = context.roas / targetRoas;
+    if (context.conversions >= minScaleConversions && roasRatio >= 1.15) {
+      return { finalVerdict: "SCALE", overrides: hasHeadroom ? ["efficient_with_headroom"] : ["efficient"] };
+    }
+    if (roasRatio < 0.55 && hasEnoughSpendToJudge) {
+      return { finalVerdict: "PAUSE", overrides: ["roas_too_low"] };
+    }
+    if (roasRatio < 0.85) {
+      return { finalVerdict: "OPTIMIZE", overrides: ["roas_below_target"] };
+    }
+    return { finalVerdict: "MAINTAIN", overrides };
+  }
+
+  const cpaRatio = context.cpa / targetCpa;
+  if (context.conversions >= minScaleConversions && cpaRatio <= 0.9) {
+    return { finalVerdict: "SCALE", overrides: hasHeadroom ? ["efficient_with_headroom"] : ["efficient"] };
+  }
+
+  if (cpaRatio >= 1.55 && hasEnoughSpendToJudge) {
+    return { finalVerdict: "PAUSE", overrides: ["cpl_too_high"] };
+  }
+
+  if (cpaRatio > 1.15) {
+    return { finalVerdict: "OPTIMIZE", overrides: ["cpl_above_reference"] };
+  }
+
+  return { finalVerdict: "MAINTAIN", overrides };
 }
 
 function enrichCampaign(row, benchmarks) {
@@ -715,11 +762,20 @@ function enrichCampaign(row, benchmarks) {
     lostBudget,
     lostRank,
     roas,
+    targetRoas,
     hasRevenue: value > 0
   });
   const rawVerdict = scoreToVerdict(scoring.total);
-  const protectedVerdict = applyProtections(rawVerdict, {
+  const protectedVerdict = decideCampaignByRules({
+    spend,
     conversions,
+    cpa,
+    roas,
+    targetCpa,
+    targetRoas,
+    lostBudget,
+    lostRank,
+    hasRevenue: value > 0,
     ipm: marketContext.ipm,
     seasonalityRatio: marketContext.components.seasonalityRatio
   });
@@ -727,29 +783,44 @@ function enrichCampaign(row, benchmarks) {
   const decision = mapVerdictToDecision(finalVerdict);
   const headroom = scoring.headroomScore;
   const scalePct = Math.round(20 + headroom * 0.1);
-  const budgetMove = finalVerdict === "SCALE" ? `+${scalePct}%` : finalVerdict === "PAUSE" ? "-100%" : "0%";
+  const budgetMove = finalVerdict === "SCALE" ? `+${scalePct}%` : finalVerdict === "PAUSE" ? "Parar" : "0%";
   const action =
     finalVerdict === "SCALE"
       ? `Subir presupuesto ${scalePct}%`
       : finalVerdict === "PAUSE"
-        ? "Pausar o reestructurar"
+        ? "Parar o reestructurar"
         : finalVerdict === "OPTIMIZE"
           ? "Optimizar sin tocar presupuesto"
           : finalVerdict === "REVIEW"
             ? "Revision humana"
             : "Mantener y vigilar";
   const reasons = [
-    `Score ${number(scoring.total, 0)}/100 · ${verdictLabel(finalVerdict)}`,
+    `Decision: ${verdictLabel(finalVerdict)} · indice ${number(scoring.total, 0)}/100`,
     economicsTarget
       ? `Objetivo negocio: CPL ${money(targetCpa)} · CAC max ${money(economicsTarget.targetCac)}`
       : dashboardMode === "ecommerce"
       ? `ROAS ${number(roas, 2)}x · CPA ${money(cpa)}`
       : `CPL ${money(cpa)} vs referencia ${money(targetCpa)}`,
-    `Volumen ${number(scoring.volumeScore, 0)}/100 · margen ${number(scoring.headroomScore, 0)}/100`
+    `Conversiones ${number(conversions, 1)} · margen de escala ${number(scoring.headroomScore, 0)}/100`
   ];
 
-  if (protectedVerdict.overrides.includes("insufficient_volume")) {
-    reasons.push("Proteccion: volumen insuficiente para decidir agresivamente");
+  if (protectedVerdict.overrides.includes("low_volume")) {
+    reasons.push("Volumen bajo: aprender antes de escalar o parar");
+  }
+  if (protectedVerdict.overrides.includes("spend_without_conversions")) {
+    reasons.push("Gasto suficiente sin conversiones: parar y revisar estructura");
+  }
+  if (protectedVerdict.overrides.includes("efficient")) {
+    reasons.push("Mejor que la referencia del cliente: candidata a escalar");
+  }
+  if (protectedVerdict.overrides.includes("efficient_with_headroom")) {
+    reasons.push("Mejor que referencia y con margen de impresiones");
+  }
+  if (protectedVerdict.overrides.includes("cpl_too_high")) {
+    reasons.push("CPL muy por encima de la referencia del cliente");
+  }
+  if (protectedVerdict.overrides.includes("cpl_above_reference")) {
+    reasons.push("CPL por encima de referencia: optimizar antes de invertir mas");
   }
 
   return {
@@ -1186,7 +1257,7 @@ function renderPriorities(campaigns, assets, keywords, searchTerms) {
   const riskyKeywords = keywords.filter((keyword) => keyword.needsReview).length;
 
   if (scaleCount) priorities.push(["green", `${scaleCount} campana(s) listas para escalar`, "Subida gradual con control de CPA/ROAS."]);
-  if (cutCount) priorities.push(["red", `${cutCount} campana(s) para quitar o rehacer`, "Pausar antes de seguir acumulando gasto malo."]);
+  if (cutCount) priorities.push(["red", `${cutCount} campana(s) para parar o rehacer`, "Detener antes de seguir acumulando gasto malo."]);
   if (replaceAssets) priorities.push(["amber", `${replaceAssets} asset(s) piden cambio`, "Prioridad en imagenes, titulos o descripciones con bajo CTR."]);
   if (negatives) priorities.push(["red", `${negatives} negativa(s) sugeridas`, "Exporta el CSV y revisa antes de aplicar."]);
   if (riskyKeywords) priorities.push(["amber", `${riskyKeywords} keyword(s) caras`, "Revisar concordancia, puja y terminos asociados."]);
@@ -1366,7 +1437,9 @@ function handleCsvUpload(event) {
 }
 
 function exportPlan() {
-  const campaigns = currentRows("campaign").map(enrichCampaign);
+  const campaignRows = currentRows("campaign");
+  const benchmarks = buildClientBenchmarks(campaignRows);
+  const campaigns = campaignRows.map((campaign) => enrichCampaign(campaign, benchmarks));
   exportCsv("plan-optimizacion-campanas.csv", campaigns, [
     { label: "cliente", value: (item) => item.client },
     { label: "campana", value: (item) => item.campaign },

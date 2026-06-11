@@ -1,6 +1,6 @@
 # Dahsboard Gads
 
-Dashboard para decidir que campanas escalar, mantener o quitar, auditar assets, revisar keywords y preparar negativas.
+Dashboard para decidir que campanas escalar, mantener o parar, auditar assets, revisar keywords y preparar negativas.
 
 ## Abrir
 
@@ -127,7 +127,7 @@ Veredictos:
 En el dashboard de 3 columnas se mapea asi:
 
 - `SCALE` -> Escalar
-- `PAUSE` -> Quitar
+- `PAUSE` -> Parar
 - `MAINTAIN`, `OPTIMIZE`, `REVIEW`, `INSUFFICIENT_DATA` -> Mantener
 
 Protecciones actuales:
