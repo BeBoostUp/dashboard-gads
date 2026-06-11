@@ -1519,12 +1519,13 @@ async function loadApiData(options = {}) {
       t: String(Date.now())
     });
     if (options.force) params.set("force", "1");
+    if (options.scope) params.set("scope", options.scope);
     const snapshot = await apiGet(`/api/google-ads/snapshot?${params.toString()}`);
     if (!snapshot.rows?.length) {
       showToast("La API respondio, pero no devolvio campanas");
       return;
     }
-    rows = snapshot.rows;
+    rows = snapshot.scope === "overview" ? mergeOverviewRows(snapshot.rows) : snapshot.rows;
     dataSource = "api";
     saveRows();
     saveMeta(snapshot);
@@ -1546,6 +1547,7 @@ function saveMeta(snapshot) {
     JSON.stringify({
       source: snapshot.source,
       days: snapshot.days,
+      scope: snapshot.scope || "full",
       pulledAt: snapshot.pulledAt,
       rowCount: snapshot.rows?.length || 0,
       accountCount: snapshot.accounts?.length || 0,
@@ -1572,7 +1574,7 @@ async function handleWindowChange() {
   els.customWindowLabel.classList.toggle("is-hidden", !custom);
 
   if (dataSource === "api") {
-    await loadApiData({ auto: true, force: true });
+    await loadApiData({ auto: true, force: true, scope: "overview" });
     return;
   }
 
@@ -1588,18 +1590,39 @@ async function initApi() {
 }
 
 async function apiGet(path) {
-  const response = await fetch(path, {
-    cache: "no-store",
-    headers: {
-      Accept: "application/json",
-      "Cache-Control": "no-cache"
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 75_000);
+  let response;
+  try {
+    response = await fetch(path, {
+      cache: "no-store",
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+        "Cache-Control": "no-cache"
+      }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.message || data.error || "No se pudo conectar con el backend");
     }
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data.message || data.error || "No se pudo conectar con el backend");
+    return data;
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("La carga esta tardando demasiado. Prueba con menos dias o pulsa Cargar datos reales de nuevo.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-  return data;
+}
+
+function mergeOverviewRows(overviewRows) {
+  const overviewEntities = new Set(["campaign", "conversion_action"]);
+  return [
+    ...overviewRows,
+    ...rows.filter((row) => !overviewEntities.has(row.entity))
+  ];
 }
 
 function setBusy(button, busy, text) {

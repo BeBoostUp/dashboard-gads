@@ -120,7 +120,8 @@ async function handleApi(request, response, url) {
     assertConfigured();
     const days = normalizeDays(url.searchParams.get("days"));
     const force = url.searchParams.get("force") === "1";
-    const snapshot = await getCachedDashboardSnapshot(days, force);
+    const scope = normalizeSnapshotScope(url.searchParams.get("scope"));
+    const snapshot = await getCachedDashboardSnapshot(days, force, scope);
     sendJson(response, 200, snapshot);
     return;
   }
@@ -138,9 +139,10 @@ function scheduleSnapshotRefresh() {
   }
 
   const interval = setInterval(() => {
-    for (const days of snapshotCache.keys()) {
-      refreshSnapshot(days).catch((error) => {
-        console.error(`No se pudo refrescar snapshot ${days} dias: ${error.message}`);
+    for (const cacheKey of snapshotCache.keys()) {
+      const [days, scope = "full"] = String(cacheKey).split(":");
+      refreshSnapshot(normalizeDays(days), normalizeSnapshotScope(scope)).catch((error) => {
+        console.error(`No se pudo refrescar snapshot ${cacheKey}: ${error.message}`);
       });
     }
   }, refreshIntervalMinutes * 60 * 1000);
@@ -203,7 +205,8 @@ async function getAccessToken() {
   const result = await fetchJson("https://www.googleapis.com/oauth2/v3/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body
+    body,
+    timeoutMs: 15_000
   });
 
   if (!result.access_token) {
@@ -296,20 +299,21 @@ async function getAccountHierarchy(seedCustomerId) {
   return dedupeAccounts(accounts);
 }
 
-async function getDashboardSnapshot(days) {
+async function getDashboardSnapshot(days, scope = "full") {
   const hierarchy = await getAccountHierarchy(getEnvId("GOOGLE_ADS_TARGET_MCC_ID"));
   const clientAccounts = hierarchy.filter((account) => !account.manager && account.status === "ENABLED");
   const rows = [];
   const errors = [];
 
   for (const account of clientAccounts) {
-    const accountRows = await getAccountRows(account, days, errors);
+    const accountRows = await getAccountRows(account, days, errors, scope);
     rows.push(...accountRows);
   }
 
   return {
     source: "google_ads_api",
     days,
+    scope,
     pulledAt: new Date().toISOString(),
     targetMccId: maskId(process.env.GOOGLE_ADS_TARGET_MCC_ID),
     accounts: clientAccounts,
@@ -318,21 +322,23 @@ async function getDashboardSnapshot(days) {
   };
 }
 
-async function getCachedDashboardSnapshot(days, force = false) {
-  const cached = snapshotCache.get(days);
+async function getCachedDashboardSnapshot(days, force = false, scope = "full") {
+  const cacheKey = `${days}:${scope}`;
+  const cached = snapshotCache.get(cacheKey);
   const maxAgeMs = refreshIntervalMinutes * 60 * 1000;
   const isFresh = cached?.data && Date.now() - cached.pulledAt < maxAgeMs;
 
   if (!force && isFresh) return { ...cached.data, cached: true };
   if (cached?.refreshing) return cached.refreshing;
 
-  return refreshSnapshot(days);
+  return refreshSnapshot(days, scope);
 }
 
-export async function refreshSnapshot(days) {
-  const current = snapshotCache.get(days) || {};
-  const refreshing = getDashboardSnapshot(days).then((data) => {
-    snapshotCache.set(days, {
+export async function refreshSnapshot(days, scope = "full") {
+  const cacheKey = `${days}:${scope}`;
+  const current = snapshotCache.get(cacheKey) || {};
+  const refreshing = getDashboardSnapshot(days, scope).then((data) => {
+    snapshotCache.set(cacheKey, {
       data,
       pulledAt: Date.now(),
       refreshing: null
@@ -340,7 +346,7 @@ export async function refreshSnapshot(days) {
     return { ...data, cached: false };
   });
 
-  snapshotCache.set(days, {
+  snapshotCache.set(cacheKey, {
     ...current,
     refreshing
   });
@@ -348,7 +354,7 @@ export async function refreshSnapshot(days) {
   try {
     return await refreshing;
   } catch (error) {
-    snapshotCache.set(days, {
+    snapshotCache.set(cacheKey, {
       ...current,
       refreshing: null
     });
@@ -356,16 +362,20 @@ export async function refreshSnapshot(days) {
   }
 }
 
-async function getAccountRows(account, days, errors) {
+async function getAccountRows(account, days, errors, scope = "full") {
   const rows = [];
-  const readers = [
+  const overviewReaders = [
     ["conversion_actions", getConversionActionRows],
-    ["campaigns", getCampaignRows],
+    ["campaigns", getCampaignRows]
+  ];
+  const fullReaders = [
+    ...overviewReaders,
     ["keywords", getKeywordRows],
     ["search_terms", getSearchTermRows],
     ["ad_assets", getAdAssetRows],
     ["pmax_assets", getAssetGroupAssetRows]
   ];
+  const readers = scope === "overview" ? overviewReaders : fullReaders;
 
   for (const [scope, reader] of readers) {
     try {
@@ -672,7 +682,23 @@ function mapAssetRow(account, result, linkage, source) {
 }
 
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, options);
+  const { timeoutMs = 25_000, ...fetchOptions } = options;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let response;
+  try {
+    response = await fetch(url, {
+      ...fetchOptions,
+      signal: fetchOptions.signal || controller.signal
+    });
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("Google Ads tardo demasiado en responder");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   const text = await response.text();
   let data = {};
   try {
@@ -704,6 +730,10 @@ export function normalizeDays(value) {
   const days = Math.round(Number(value || 30));
   if (!Number.isFinite(days)) return 30;
   return Math.min(365, Math.max(1, days));
+}
+
+function normalizeSnapshotScope(value) {
+  return value === "overview" ? "overview" : "full";
 }
 
 function getDateRange(days) {
