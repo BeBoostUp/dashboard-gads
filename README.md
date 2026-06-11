@@ -62,13 +62,15 @@ El dashboard se actualiza solo al abrir si no hay datos reales o si la ultima le
 
 ## Ponerlo online
 
-Para esta primera version recomiendo Render antes que Vercel, porque este proyecto usa un servidor Node largo con cache y refresco programado. Vercel tambien se puede usar, pero para refresco real en segundo plano necesitariamos adaptar la API a serverless y anadir una base de datos/cache externa.
+Esta version esta adaptada para Vercel:
 
-Ya hay un archivo `render.yaml` preparado para Render.
+- El dashboard se sirve como web estatica.
+- Las rutas `/api/google-ads/*` funcionan como Vercel Functions.
+- `vercel.json` configura un cron cada 6 horas en `/api/cron/refresh`.
 
-1. Sube este proyecto a un repositorio privado.
-2. En Render crea un `Blueprint` desde ese repositorio.
-3. Render leera `render.yaml`.
+1. Importa el repo `BeBoostUp/dashboard-gads` en Vercel.
+2. Usa framework preset `Other`.
+3. Deja `Build command` y `Output directory` vacios.
 4. Copia las variables privadas desde tu `.env`.
 
 Variables privadas necesarias:
@@ -80,11 +82,16 @@ GOOGLE_ADS_CLIENT_SECRET
 GOOGLE_ADS_REFRESH_TOKEN
 GOOGLE_ADS_LOGIN_CUSTOMER_ID
 GOOGLE_ADS_TARGET_MCC_ID
+GOOGLE_ADS_API_VERSION=v22
+GOOGLE_ADS_PER_ACCOUNT_LIMIT=50
+GOOGLE_ADS_REFRESH_INTERVAL_MINUTES=360
+GOOGLE_ADS_AUTO_PRIME=false
+CRON_SECRET
 ```
 
-El resto de valores online ya van configurados en `render.yaml`: `HOST=0.0.0.0`, autoarranque de datos y refresco cada 6 horas.
+Guia paso a paso: `DEPLOY_VERCEL.md`.
 
-Guia paso a paso: `DEPLOY_RENDER.md`.
+Nota: en Vercel la cache en memoria puede desaparecer entre ejecuciones. Para historico diario y auto-refresco fiable entre usuarios, la siguiente fase deberia anadir Supabase/Postgres o Vercel KV.
 
 ## Scoring actual
 

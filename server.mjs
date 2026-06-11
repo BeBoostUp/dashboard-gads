@@ -33,12 +33,32 @@ const requiredEnv = [
   "GOOGLE_ADS_TARGET_MCC_ID"
 ];
 
-const server = http.createServer(async (request, response) => {
+if (isDirectRun()) {
+  const server = http.createServer(async (request, response) => {
+    await handleRequest(request, response);
+  });
+
+  server.listen(port, host, () => {
+    console.log(`Google Ads Command Center: http://localhost:${port}`);
+    scheduleSnapshotRefresh();
+  });
+}
+
+export async function handleApiRequest(request, response) {
+  await handleRequest(request, response, { apiOnly: true });
+}
+
+async function handleRequest(request, response, options = {}) {
   const url = new URL(request.url || "/", `http://${request.headers.host}`);
 
   try {
     if (url.pathname.startsWith("/api/")) {
       await handleApi(request, response, url);
+      return;
+    }
+
+    if (options.apiOnly) {
+      sendJson(response, 404, { error: "NOT_FOUND" });
       return;
     }
 
@@ -49,12 +69,11 @@ const server = http.createServer(async (request, response) => {
       message: error.message || "Error interno"
     });
   }
-});
+}
 
-server.listen(port, host, () => {
-  console.log(`Google Ads Command Center: http://localhost:${port}`);
-  scheduleSnapshotRefresh();
-});
+function isDirectRun() {
+  return process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+}
 
 function loadDotEnv() {
   const envPath = join(root, ".env");
@@ -153,7 +172,7 @@ async function serveStatic(response, url) {
   }
 }
 
-function getGoogleAdsStatus() {
+export function getGoogleAdsStatus() {
   const missing = requiredEnv.filter((key) => !process.env[key]);
   return {
     configured: missing.length === 0,
@@ -164,7 +183,7 @@ function getGoogleAdsStatus() {
   };
 }
 
-function assertConfigured() {
+export function assertConfigured() {
   const status = getGoogleAdsStatus();
   if (!status.configured) {
     const error = new Error(`Faltan variables: ${status.missing.join(", ")}`);
@@ -310,7 +329,7 @@ async function getCachedDashboardSnapshot(days, force = false) {
   return refreshSnapshot(days);
 }
 
-async function refreshSnapshot(days) {
+export async function refreshSnapshot(days) {
   const current = snapshotCache.get(days) || {};
   const refreshing = getDashboardSnapshot(days).then((data) => {
     snapshotCache.set(days, {
@@ -681,7 +700,7 @@ async function fetchJson(url, options = {}) {
   return data;
 }
 
-function normalizeDays(value) {
+export function normalizeDays(value) {
   const days = Number(value || 30);
   return [7, 14, 30, 90].includes(days) ? days : 30;
 }
@@ -758,7 +777,7 @@ function dedupeAccounts(accounts) {
   return [...byId.values()].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
 }
 
-function sendJson(response, statusCode, payload) {
+export function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store"
