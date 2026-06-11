@@ -380,6 +380,8 @@ const els = {
   modeDescription: document.querySelector("#modeDescription"),
   clientFilter: document.querySelector("#clientFilter"),
   windowFilter: document.querySelector("#windowFilter"),
+  customWindowLabel: document.querySelector("#customWindowLabel"),
+  customWindowInput: document.querySelector("#customWindowInput"),
   resetDemo: document.querySelector("#resetDemo"),
   csvInput: document.querySelector("#csvInput"),
   exportPlan: document.querySelector("#exportPlan"),
@@ -499,7 +501,17 @@ function isActiveRow(row) {
 }
 
 function currentWindowDays() {
+  if (els.windowFilter.value === "custom") {
+    return String(clamp(Math.round(safeNumber(els.customWindowInput.value) || 30), 1, 365));
+  }
   return String(els.windowFilter.value || "30");
+}
+
+function currentWindowLabel() {
+  const days = currentWindowDays();
+  return els.windowFilter.value === "custom"
+    ? `Ultimos ${days} dias`
+    : els.windowFilter.selectedOptions[0]?.textContent || `Ultimos ${days} dias`;
 }
 
 function getSelectedClient() {
@@ -1497,7 +1509,7 @@ async function checkApiStatus() {
 }
 
 async function loadApiData(options = {}) {
-  const days = els.windowFilter.value || "30";
+  const days = currentWindowDays();
   const label = options.auto ? "Actualizando..." : "Cargando...";
   setBusy(els.loadApiData, true, label);
   try {
@@ -1539,11 +1551,28 @@ function shouldAutoLoadApi(status) {
   try {
     const meta = JSON.parse(localStorage.getItem(metaKey) || "null");
     if (dataSource !== "api" || !meta?.pulledAt) return true;
+    if (String(meta.days) !== currentWindowDays()) return true;
     const ageMs = Date.now() - new Date(meta.pulledAt).getTime();
     return ageMs > 6 * 60 * 60 * 1000;
   } catch {
     return true;
   }
+}
+
+async function handleWindowChange() {
+  const custom = els.windowFilter.value === "custom";
+  els.customWindowLabel.classList.toggle("is-hidden", !custom);
+  if (custom) {
+    els.customWindowInput.value = currentWindowDays();
+  }
+
+  if (dataSource === "api") {
+    await loadApiData({ auto: true });
+    return;
+  }
+
+  render();
+  showToast(`Vista cambiada a ${currentWindowLabel()}`);
 }
 
 async function initApi() {
@@ -1586,9 +1615,8 @@ function escapeHtml(value) {
 }
 
 els.clientFilter.addEventListener("change", render);
-els.windowFilter.addEventListener("change", () => {
-  showToast(`Vista cambiada a ${els.windowFilter.selectedOptions[0].textContent}`);
-});
+els.windowFilter.addEventListener("change", handleWindowChange);
+els.customWindowInput.addEventListener("change", handleWindowChange);
 els.assetActionFilter.addEventListener("change", render);
 els.csvInput.addEventListener("change", handleCsvUpload);
 els.resetDemo.addEventListener("click", () => {

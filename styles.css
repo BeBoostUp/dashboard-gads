@@ -235,6 +235,24 @@ select {
   padding: 0 34px 0 10px;
 }
 
+.custom-window {
+  width: 92px;
+}
+
+.custom-window input {
+  min-height: 38px;
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 0 10px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.is-hidden {
+  display: none !important;
+}
+
 .secondary-button,
 .primary-button,
 .file-button,
@@ -1036,6 +1054,7 @@ tr:last-child td {
   }
 
   select,
+  .custom-window,
   .secondary-button,
   .primary-button,
   .file-button {

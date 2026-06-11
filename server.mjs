@@ -701,8 +701,9 @@ async function fetchJson(url, options = {}) {
 }
 
 export function normalizeDays(value) {
-  const days = Number(value || 30);
-  return [7, 14, 30, 90].includes(days) ? days : 30;
+  const days = Math.round(Number(value || 30));
+  if (!Number.isFinite(days)) return 30;
+  return Math.min(365, Math.max(1, days));
 }
 
 function getDateRange(days) {

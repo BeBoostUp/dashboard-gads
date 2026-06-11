@@ -54,7 +54,12 @@
                 <option value="14">Ultimos 14 dias</option>
                 <option value="30" selected>Ultimos 30 dias</option>
                 <option value="90">Ultimos 90 dias</option>
+                <option value="custom">Personalizado</option>
               </select>
+            </label>
+            <label id="customWindowLabel" class="custom-window is-hidden">
+              Dias
+              <input id="customWindowInput" type="number" min="1" max="365" step="1" value="30" />
             </label>
             <button class="secondary-button" id="resetDemo">Restaurar demo</button>
           </div>
